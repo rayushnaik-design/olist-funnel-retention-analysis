@@ -51,7 +51,34 @@ WHERE first_orders.order_rank = 1
 GROUP BY delivery_experience;
 """
 df_delivery = pd.read_sql(query2, conn)
+from scipy.stats import chi2_contingency
 
+# --- A/B Test: Is the delivery-experience repeat-rate difference statistically significant? ---
+# Build a 2x2 contingency table: rows = delivery experience, columns = repeat vs not repeat
+on_time_customers = df_delivery[df_delivery['delivery_experience'] == 'On time or early']['num_customers'].values[0]
+on_time_repeat = df_delivery[df_delivery['delivery_experience'] == 'On time or early']['repeat_customers'].values[0]
+on_time_not_repeat = on_time_customers - on_time_repeat
+
+late_customers = df_delivery[df_delivery['delivery_experience'] == 'Late']['num_customers'].values[0]
+late_repeat = df_delivery[df_delivery['delivery_experience'] == 'Late']['repeat_customers'].values[0]
+late_not_repeat = late_customers - late_repeat
+
+contingency_table = [
+    [on_time_repeat, on_time_not_repeat],
+    [late_repeat, late_not_repeat]
+]
+
+chi2_stat, p_value, dof, expected = chi2_contingency(contingency_table)
+
+print(f"\n--- A/B Test Result ---")
+print(f"Contingency table: {contingency_table}")
+print(f"Chi-square statistic: {chi2_stat:.4f}")
+print(f"P-value: {p_value:.6f}")
+
+if p_value < 0.05:
+    print("Result: STATISTICALLY SIGNIFICANT (p < 0.05) — the difference is unlikely due to random chance.")
+else:
+    print("Result: NOT statistically significant (p >= 0.05) — the difference could be due to random chance.")
 # --- Query 3: Category vs repeat rate ---
 query3 = """
 SELECT 
